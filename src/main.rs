@@ -6,12 +6,9 @@ use ssh_agent_lib::client::connect;
 use ssh_agent_lib::error::AgentError;
 use ssh_agent_lib::proto::{Identity, SignRequest};
 use ssh_key::Signature;
-use std::path::PathBuf;
 use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
 use tokio::net::UnixListener as Listener;
-
-#[derive(Default, Clone)]
-struct MyAgent;
 
 pub fn find_agents() -> Vec<Binding> {
     let potential = glob("/tmp/ssh-*/agent.*").expect("Failed to glob()");
@@ -20,6 +17,9 @@ pub fn find_agents() -> Vec<Binding> {
         .filter_map(|file| Some(Binding::FilePath(file.ok()?)))
         .collect()
 }
+
+#[derive(Clone)]
+struct MyAgent;
 
 #[ssh_agent_lib::async_trait]
 impl Session for MyAgent {
@@ -38,10 +38,9 @@ impl Session for MyAgent {
             };
 
             for new_identity in client.request_identities().await.unwrap_or(vec![]) {
-                if identities
+                if !identities
                     .iter()
-                    .find(|ident| ident.pubkey == new_identity.pubkey)
-                    .is_none()
+                    .any(|ident| ident.pubkey == new_identity.pubkey)
                 {
                     identities.push(new_identity);
                 }
@@ -88,7 +87,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _ = std::fs::create_dir(cli.socket_dir.clone());
 
-    std::fs::set_permissions(cli.socket_dir.clone(), std::fs::Permissions::from_mode(0o700))?;
+    std::fs::set_permissions(
+        cli.socket_dir.clone(),
+        std::fs::Permissions::from_mode(0o700),
+    )?;
 
     let socket = cli.socket_dir.join("agent.sock");
 
@@ -96,10 +98,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = Listener::bind(socket.clone())?;
 
-    std::fs::set_permissions(listener.local_addr()?.as_pathname().unwrap(), std::fs::Permissions::from_mode(0o600))?;
+    std::fs::set_permissions(
+        listener.local_addr()?.as_pathname().unwrap(),
+        std::fs::Permissions::from_mode(0o600),
+    )?;
 
     tokio::select! {
-        _ = listen(listener, MyAgent::default()) => {}
+        _ = listen(listener, MyAgent) => {}
         _ = tokio::signal::ctrl_c() => {}
     }
 
