@@ -1,0 +1,13 @@
+[package]
+name = "auto-agent-mux"
+version = "0.1.0"
+edition = "2021"
+description = "Automatically find running SSH agents and mux them"
+
+[dependencies]
+clap = { version = "4.5.31", features = ["derive"] }
+glob = "0.3.2"
+service-binding = "3.0.0"
+ssh-agent-lib = "0.5.1"
+ssh-key = "0.6.7"
+tokio = { version = "1.43.0", features = ["full"] }
