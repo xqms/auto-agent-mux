@@ -7,6 +7,7 @@ use ssh_agent_lib::error::AgentError;
 use ssh_agent_lib::proto::{Identity, SignRequest};
 use ssh_key::Signature;
 use std::path::PathBuf;
+use std::os::unix::fs::PermissionsExt;
 use tokio::net::UnixListener as Listener;
 
 #[derive(Default, Clone)]
@@ -77,19 +78,32 @@ impl Session for MyAgent {
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    #[arg(short, long, value_name = "FILE")]
-    socket: PathBuf,
+    #[arg(short, long, value_name = "DIR")]
+    socket_dir: PathBuf,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
-    let _ = std::fs::remove_file(cli.socket.clone()); // remove the socket if exists
+    let _ = std::fs::create_dir(cli.socket_dir.clone());
 
-    let _ = listen(Listener::bind(cli.socket.clone())?, MyAgent::default()).await;
+    std::fs::set_permissions(cli.socket_dir.clone(), std::fs::Permissions::from_mode(0o700))?;
 
-    let _ = std::fs::remove_file(cli.socket.clone()); // remove the socket if exists
+    let socket = cli.socket_dir.join("agent.sock");
+
+    let _ = std::fs::remove_file(socket.clone()); // remove the socket if exists
+
+    let listener = Listener::bind(socket.clone())?;
+
+    std::fs::set_permissions(listener.local_addr()?.as_pathname().unwrap(), std::fs::Permissions::from_mode(0o600))?;
+
+    tokio::select! {
+        _ = listen(listener, MyAgent::default()) => {}
+        _ = tokio::signal::ctrl_c() => {}
+    }
+
+    let _ = std::fs::remove_file(socket.clone()); // remove the socket if exists
 
     Ok(())
 }
