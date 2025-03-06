@@ -35,7 +35,7 @@ if ! grep 'auto-agent-mux' ~/.bashrc > /dev/null; then
     tee -a ~/.bashrc > /dev/null <<EOF
 
 # auto-agent-mux
-if [ ! -z $${TMUX+x} ]; then
+if [ ! -z \${TMUX+x} ]; then
     export SSH_AUTH_SOCK=${XDG_RUNTIME_DIR}/auto-agent-mux/agent.sock
 fi
 EOF
