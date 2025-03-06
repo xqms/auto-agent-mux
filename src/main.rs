@@ -6,6 +6,7 @@ use ssh_agent_lib::client::connect;
 use ssh_agent_lib::error::AgentError;
 use ssh_agent_lib::proto::{Identity, SignRequest};
 use ssh_key::Signature;
+use std::env;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use tokio::net::UnixListener as Listener;
@@ -13,9 +14,18 @@ use tokio::net::UnixListener as Listener;
 pub fn find_agents() -> Vec<Binding> {
     let potential = glob("/tmp/ssh-*/agent.*").expect("Failed to glob()");
 
-    potential
+    let mut valid: Vec<Binding> = potential
         .filter_map(|file| Some(Binding::FilePath(file.ok()?)))
-        .collect()
+        .collect();
+
+    if let Ok(runtime) = env::var("XDG_RUNTIME_DIR") {
+        let path : PathBuf = [runtime, String::from("openssh_agent")].iter().collect();
+        if path.exists() {
+            valid.push(Binding::FilePath(path));
+        }
+    }
+
+    valid
 }
 
 #[derive(Clone)]
