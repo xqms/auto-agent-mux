@@ -1,6 +1,6 @@
 [package]
 name = "auto-agent-mux"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Automatically find running SSH agents and mux them"
 
